@@ -60,6 +60,15 @@ defmodule GymRar.Accounts do
   """
   def get_user!(id), do: Repo.get!(User, id)
 
+  @doc """
+  Setzt das aktuelle Gym des Users (für Startseite und Workout-Vorauswahl).
+  """
+  def update_user_current_location(%User{} = user, location_id) do
+    user
+    |> User.current_workout_location_changeset(%{current_workout_location_id: location_id})
+    |> Repo.update()
+  end
+
   ## User registration
 
   @doc """

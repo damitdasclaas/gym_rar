@@ -1,9 +1,18 @@
 <header class="sticky top-0 z-10 flex min-h-[48px] items-center justify-between border-b border-[#c5d8d1] bg-[#f4edea] px-4 safe-area-inset">
-  <.link href={~p"/"} class="text-lg font-semibold text-[#12263a]">
+  <.link href={~p"/dashboard"} class="text-lg font-semibold text-[#12263a]">
     GymRAR
   </.link>
   <div class="flex items-center gap-2">
     <%= if @current_user do %>
+      <.link href={~p"/workouts"} class="min-h-[44px] flex items-center justify-center px-2 text-sm font-medium text-[#12263a]">
+        Workout
+      </.link>
+      <.link href={~p"/templates"} class="min-h-[44px] flex items-center justify-center px-2 text-sm font-medium text-[#12263a]">
+        Templates
+      </.link>
+      <.link href={~p"/exercises"} class="min-h-[44px] flex items-center justify-center px-2 text-sm font-medium text-[#12263a]">
+        Übungen
+      </.link>
       <.link
         href={~p"/users/settings"}
         class="min-h-[44px] min-w-[44px] flex items-center justify-center text-sm font-medium text-[#12263a]"

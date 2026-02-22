@@ -3,7 +3,7 @@ defmodule GymRarWeb.PageController do
 
   def home(conn, _params) do
     if conn.assigns[:current_user] do
-      redirect(conn, to: ~p"/exercises")
+      redirect(conn, to: ~p"/dashboard")
     else
       # Nur Root-Layout vom Router verwenden, kein zweites Layout (sonst Nav doppelt)
       render(conn, :home, layout: false)

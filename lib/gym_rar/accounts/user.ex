@@ -8,6 +8,7 @@ defmodule GymRar.Accounts.User do
     field :hashed_password, :string, redact: true
     field :current_password, :string, virtual: true, redact: true
     field :confirmed_at, :utc_datetime
+    belongs_to :current_workout_location, GymRar.Workouts.WorkoutLocation
 
     timestamps(type: :utc_datetime)
   end
@@ -144,6 +145,15 @@ defmodule GymRar.Accounts.User do
   def valid_password?(_, _) do
     Bcrypt.no_user_verify()
     false
+  end
+
+  @doc """
+  Changeset nur für das aktuelle Gym (current_workout_location_id).
+  """
+  def current_workout_location_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:current_workout_location_id])
+    |> foreign_key_constraint(:current_workout_location_id)
   end
 
   @doc """

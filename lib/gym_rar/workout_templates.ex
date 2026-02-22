@@ -32,9 +32,11 @@ defmodule GymRar.WorkoutTemplates do
   end
 
   def get_workout_template_with_exercises!(user_id, id) do
+    exercises_ordered = from(te in WorkoutTemplateExercise, order_by: [asc: te.position], preload: :exercise)
+
     WorkoutTemplate
     |> where([t], t.user_id == ^user_id and t.id == ^id)
-    |> preload(workout_template_exercises: :exercise)
+    |> preload(workout_template_exercises: ^exercises_ordered)
     |> Repo.one!()
   end
 
