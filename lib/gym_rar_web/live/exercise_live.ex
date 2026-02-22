@@ -25,6 +25,10 @@ defmodule GymRarWeb.ExerciseLive do
         <:subtitle>Deine Übungen verwalten</:subtitle>
       </.header>
 
+      <.link navigate={~p"/templates"} class="mb-4 inline-block text-sm text-[#06bcc1] hover:underline">
+        Workout-Templates →
+      </.link>
+
       <.simple_form
         :if={@form_exercise}
         for={@form}

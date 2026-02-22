@@ -67,6 +67,9 @@ defmodule GymRarWeb.Router do
     live_session :require_authenticated_user,
       on_mount: [{GymRarWeb.UserAuth, :ensure_authenticated}] do
       live "/exercises", ExerciseLive, :index
+      live "/templates", TemplateLive, :index
+      live "/templates/new", TemplateLive, :new
+      live "/templates/:id/edit", TemplateLive, :edit
       live "/users/settings", UserSettingsLive, :edit
       live "/users/settings/confirm_email/:token", UserSettingsLive, :confirm_email
     end
