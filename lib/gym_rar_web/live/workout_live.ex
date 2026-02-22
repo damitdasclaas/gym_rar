@@ -2,6 +2,7 @@ defmodule GymRarWeb.WorkoutLive do
   use GymRarWeb, :live_view
 
   alias GymRar.Accounts
+  alias GymRar.Exercises
   alias GymRar.WorkoutTemplates
   alias GymRar.Workouts
   alias Phoenix.LiveView.JS
@@ -42,11 +43,13 @@ defmodule GymRarWeb.WorkoutLive do
           else
             template = WorkoutTemplates.get_workout_template_with_exercises!(user_id, template_id)
             locations = Workouts.list_locations(user_id)
+            exercises = Exercises.list_exercises(user_id)
             rows = build_rows(template, user_id, location_id)
             socket
             |> assign(:templates, [])
             |> assign(:template, template)
             |> assign(:locations, locations)
+            |> assign(:exercises, exercises)
             |> assign(:location_id, location_id)
             |> assign(:new_location_name, "")
             |> assign(:rows, rows)
@@ -127,30 +130,32 @@ defmodule GymRarWeb.WorkoutLive do
         </.link>
 
         <% selected_location = Enum.find(@locations || [], &(&1.id == @location_id)) %>
-        <div class="mb-3 flex w-full flex-wrap items-center gap-2 rounded-lg border border-[#c5d8d1]/60 bg-[#f4edea]/50 px-3 py-2">
-          <span class="shrink-0 text-sm text-[#12263a]/70">Ort:</span>
-          <%= if @editing_location do %>
-            <form phx-change="set_location" class="flex min-w-0 flex-1 items-center gap-2">
-              <select
-                name="workout_location_id"
-                class="min-h-[36px] min-w-0 flex-1 rounded border border-[#c5d8d1] bg-[#f4edea] px-2 py-1 text-sm text-[#12263a]"
-              >
-                <option value="">— wählen —</option>
-                <option :for={loc <- @locations} value={loc.id} selected={@location_id == loc.id}><%= loc.name %></option>
-              </select>
-            </form>
-            <form phx-submit="add_location" class="flex min-w-0 flex-1 items-center gap-1">
-              <input type="text" name="new_location_name" value={@new_location_name} placeholder="Neu" class="min-h-[36px] min-w-0 flex-1 rounded border border-[#c5d8d1] bg-[#f4edea] px-2 py-1 text-sm text-[#12263a]" />
-              <button type="submit" class="shrink-0 min-h-[36px] rounded border border-[#06bcc1] bg-[#06bcc1]/20 px-2 py-1 text-xs font-medium text-[#12263a]">+</button>
-            </form>
-            <button type="button" phx-click="toggle_edit_location" class="shrink-0 text-sm text-[#12263a]/70 underline">Fertig</button>
-          <% else %>
-            <span class="min-w-0 flex-1 text-sm font-medium text-[#12263a]"><%= if selected_location, do: selected_location.name, else: "—" %></span>
-            <button type="button" phx-click="toggle_edit_location" class="shrink-0 text-sm text-[#06bcc1] underline">Bearbeiten</button>
-          <% end %>
+        <div class="mb-3 space-y-2">
+          <div class="flex w-full flex-wrap items-center gap-2 rounded-lg border border-[#c5d8d1]/60 bg-[#f4edea]/50 px-3 py-2">
+            <span class="shrink-0 text-sm text-[#12263a]/70">Ort:</span>
+            <%= if @editing_location do %>
+              <form phx-change="set_location" class="flex min-w-0 flex-1 items-center gap-2">
+                <select
+                  name="workout_location_id"
+                  class="min-h-[36px] min-w-0 flex-1 rounded border border-[#c5d8d1] bg-[#f4edea] px-2 py-1 text-sm text-[#12263a]"
+                >
+                  <option value="">— wählen —</option>
+                  <option :for={loc <- @locations} value={loc.id} selected={@location_id == loc.id}><%= loc.name %></option>
+                </select>
+              </form>
+              <form phx-submit="add_location" class="flex min-w-0 flex-1 items-center gap-1">
+                <input type="text" name="new_location_name" value={@new_location_name} placeholder="Neu" class="min-h-[36px] min-w-0 flex-1 rounded border border-[#c5d8d1] bg-[#f4edea] px-2 py-1 text-sm text-[#12263a]" />
+                <button type="submit" class="shrink-0 min-h-[36px] rounded border border-[#06bcc1] bg-[#06bcc1]/20 px-2 py-1 text-xs font-medium text-[#12263a]">+</button>
+              </form>
+              <button type="button" phx-click="toggle_edit_location" class="shrink-0 text-sm text-[#12263a]/70 underline">Fertig</button>
+            <% else %>
+              <span class="min-w-0 flex-1 text-sm font-medium text-[#12263a]"><%= if selected_location, do: selected_location.name, else: "—" %></span>
+              <button type="button" phx-click="toggle_edit_location" class="shrink-0 text-sm text-[#06bcc1] underline">Bearbeiten</button>
+            <% end %>
+          </div>
         </div>
 
-        <form phx-submit="save_workout" phx-change="update_set_values" class="space-y-4">
+        <form phx-submit="save_workout" phx-change="update_set_values" id="workout-form" class="space-y-4">
           <div class="space-y-2">
             <.workout_row
               :for={{row, idx} <- Enum.with_index(@rows)}
@@ -158,6 +163,8 @@ defmodule GymRarWeb.WorkoutLive do
               index={idx}
               expanded_row_index={@expanded_row_index}
               location_id={@location_id}
+              on_remove_temp={if row[:temp?], do: "remove_temp_row", else: nil}
+              on_add_set="add_set"
             />
           </div>
           <div class="flex flex-wrap gap-2 pt-4">
@@ -176,14 +183,45 @@ defmodule GymRarWeb.WorkoutLive do
           </div>
         </form>
 
+        <div class="mt-4 rounded-xl border border-dashed border-[#c5d8d1] bg-[#f4edea]/30 p-3">
+          <p class="mb-2 text-sm font-medium text-[#12263a]">Übung hinzufügen</p>
+          <form phx-submit="add_temp_exercise" id="add-exercise-form" class="space-y-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <select name="exercise_id" class="min-h-[36px] min-w-0 flex-1 rounded border border-[#c5d8d1] bg-[#f4edea] px-2 py-1 text-sm text-[#12263a] sm:max-w-[220px]">
+                <option value="">— bestehende Übung wählen —</option>
+                <option :for={ex <- @exercises} value={ex.id}><%= ex.name %></option>
+              </select>
+              <span class="text-sm text-[#12263a]/60">Sätze:</span>
+              <select name="sets_count" class="min-h-[36px] w-14 rounded border border-[#c5d8d1] bg-[#f4edea] px-2 py-1 text-sm text-[#12263a]">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+              <button type="submit" class="shrink-0 rounded border border-[#06bcc1] bg-[#06bcc1]/20 px-3 py-1.5 text-sm font-medium text-[#12263a]">Hinzufügen</button>
+            </div>
+            <p class="text-xs text-[#12263a]/60">oder neue Übung anlegen:</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <input type="text" name="new_exercise_name" placeholder="Name der neuen Übung" class="min-h-[36px] min-w-0 flex-1 rounded border border-[#c5d8d1] bg-[#f4edea] px-2 py-1 text-sm text-[#12263a] sm:max-w-[200px]" />
+              <select name="new_exercise_sets" class="min-h-[36px] w-14 rounded border border-[#c5d8d1] bg-[#f4edea] px-2 py-1 text-sm text-[#12263a]">
+                <option value="1">1 Satz</option>
+                <option value="2">2 Sätze</option>
+                <option value="3">3 Sätze</option>
+              </select>
+              <button type="submit" name="create_and_add" value="true" class="shrink-0 rounded border border-[#12263a]/50 bg-[#12263a]/10 px-3 py-1.5 text-sm font-medium text-[#12263a]">Anlegen & hinzufügen</button>
+            </div>
+          </form>
+        </div>
+
         <%= if @live_action == :new and @history_open_row_index != nil do %>
           <% history_row = Enum.at(@rows, @history_open_row_index) %>
           <.modal id="history-modal" show={true} on_cancel={JS.dispatch("close_history_modal")}>
             <div id="history-modal-content">
               <p class="mb-4 font-medium text-[#12263a]">
-                Letzte Einträge: <%= if history_row, do: history_row.template_exercise.exercise.name, else: "" %><%= if @location_id, do: " (an diesem Ort)", else: "" %>
+                Letzte Einträge: <%= if history_row && history_row[:template_exercise], do: history_row.template_exercise.exercise.name, else: "" %><%= if @location_id, do: " (an diesem Ort)", else: "" %>
               </p>
-              <%= if history_row && history_row[:history] != [] do %>
+              <%= if history_row && history_row[:template_exercise] && (history_row[:history] || []) != [] do %>
                 <div class="mb-4 space-y-4">
                   <div :for={h <- history_row[:history]} class="rounded-lg border border-[#c5d8d1]/60 bg-[#f4edea]/50 p-3">
                     <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-[#12263a]/60">
@@ -222,19 +260,28 @@ defmodule GymRarWeb.WorkoutLive do
   attr :index, :integer, required: true
   attr :expanded_row_index, :integer, required: true
   attr :location_id, :integer, default: nil
+  attr :on_remove_temp, :string, default: nil
+  attr :on_add_set, :string, default: nil
 
   defp workout_row(assigns) do
-    te = assigns.row.template_exercise
-    is_duration = te.default_duration_seconds != nil
-    target_text = target_text(te)
+    {exercise_name, is_duration, target_text, show_history} =
+      if assigns.row[:template_exercise] do
+        te = assigns.row.template_exercise
+        {te.exercise.name, te.default_duration_seconds != nil, target_text(te), true}
+      else
+        ex = assigns.row.exercise
+        {ex.name, false, "—", false}
+      end
+
     expanded? = assigns.expanded_row_index == assigns.index
 
     assigns =
       assigns
-      |> assign(:exercise_name, te.exercise.name)
+      |> assign(:exercise_name, exercise_name)
       |> assign(:is_duration, is_duration)
       |> assign(:target_text, target_text)
       |> assign(:expanded?, expanded?)
+      |> assign(:show_history, show_history)
 
     ~H"""
     <div class="rounded-xl border border-[#c5d8d1] bg-[#c5d8d1]/20 overflow-hidden">
@@ -246,12 +293,24 @@ defmodule GymRarWeb.WorkoutLive do
       >
         <span class="font-medium text-[#12263a]"><%= @index + 1 %>. <%= @exercise_name %></span>
         <span class="hidden shrink-0 text-sm text-[#12263a]/60 sm:inline"><%= @target_text %></span>
-        <span class={["shrink-0 transition-transform", @expanded? && "rotate-90"]}>▶</span>
+        <span class="flex shrink-0 items-center gap-2">
+          <button
+            :if={@on_remove_temp}
+            type="button"
+            phx-click={@on_remove_temp}
+            phx-value-index={@index}
+            class="rounded border border-red-300 bg-red-50 px-2 py-0.5 text-xs text-red-700 hover:bg-red-100"
+          >
+            Entfernen
+          </button>
+          <span class={["transition-transform", @expanded? && "rotate-90"]}>▶</span>
+        </span>
       </button>
       <div :if={@expanded?} class="border-t border-[#c5d8d1] bg-[#f4edea]/80 px-3 py-3 sm:px-4">
         <div class="mb-3 flex flex-wrap items-center gap-2">
           <span class="text-sm text-[#12263a]/70"><%= @target_text %></span>
           <button
+            :if={@show_history}
             type="button"
             phx-click="open_history_modal"
             phx-value-index={@index}
@@ -263,10 +322,23 @@ defmodule GymRarWeb.WorkoutLive do
         <div class="space-y-3">
           <div
             :for={{set, set_idx} <- Enum.with_index(@row.sets)}
-            class="flex w-full flex-wrap items-center gap-2 rounded-lg border border-[#c5d8d1]/50 bg-white/60 p-2 sm:p-3"
+            class="flex flex-col gap-2 rounded-lg border border-[#c5d8d1]/50 bg-white/60 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:p-3"
           >
-            <span class="w-10 shrink-0 text-sm font-medium text-[#12263a]/70">Satz <%= set_idx + 1 %></span>
-            <div class="flex min-h-[44px] min-w-0 flex-1 items-center gap-1 rounded-lg border border-[#c5d8d1] bg-[#f4edea] pl-2 pr-1">
+            <div class={["flex min-h-[44px] items-center gap-2 sm:shrink-0", set["skipped"] && "opacity-60"]}>
+              <span class="w-10 shrink-0 text-sm font-medium text-[#12263a]/70">Satz <%= set_idx + 1 %></span>
+              <label class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#c5d8d1]/50 bg-[#f4edea]/60 px-3 py-2 text-sm text-[#12263a]/80" title="Körpergewicht (z.B. Klimmzug, Liegestütz)">
+                <input
+                  type="checkbox"
+                  name={"row_#{@index}_set_#{set_idx}_weight_bodyweight"}
+                  checked={set["weight_bodyweight"]}
+                  value="true"
+                  disabled={set["skipped"]}
+                  class="h-4 w-4 rounded border-[#c5d8d1]"
+                />
+                <span>KG</span>
+              </label>
+            </div>
+            <div :if={!set["weight_bodyweight"]} class={["flex min-h-[48px] w-full items-center gap-1 rounded-lg border border-[#c5d8d1] bg-[#f4edea] pl-2 pr-2 sm:min-w-0 sm:flex-1 sm:w-auto", set["skipped"] && "opacity-60"]}>
               <.icon name="hero-scale-solid" class="h-4 w-4 shrink-0 text-[#12263a]/50" />
               <input
                 type="number"
@@ -275,12 +347,27 @@ defmodule GymRarWeb.WorkoutLive do
                 value={set["weight_kg"]}
                 step="0.5"
                 min="0"
-                placeholder="kg"
-                class="min-w-0 flex-1 border-0 bg-transparent py-2 pl-1 pr-2 text-[#12263a] focus:ring-0"
+                placeholder="Gewicht (kg)"
+                disabled={set["skipped"]}
+                class="min-w-0 flex-1 border-0 bg-transparent py-2 pl-1 pr-2 text-[#12263a] focus:ring-0 disabled:opacity-70"
+              />
+            </div>
+            <div :if={set["weight_bodyweight"]} class={["flex min-h-[48px] w-full items-center gap-1 rounded-lg border border-[#c5d8d1] bg-[#f4edea] pl-2 pr-2 sm:min-w-0 sm:flex-1 sm:w-auto", set["skipped"] && "opacity-60"]}>
+              <.icon name="hero-scale-solid" class="h-4 w-4 shrink-0 text-[#12263a]/50" />
+              <input
+                type="number"
+                name={"row_#{@index}_set_#{set_idx}_weight_extra_kg"}
+                id={"extra_#{@index}_#{set_idx}"}
+                value={set["weight_extra_kg"]}
+                step="0.5"
+                min="0"
+                placeholder="Extra (kg)"
+                disabled={set["skipped"]}
+                class="min-w-0 flex-1 border-0 bg-transparent py-2 pl-1 pr-2 text-[#12263a] focus:ring-0 disabled:opacity-70"
               />
             </div>
             <%= if @is_duration do %>
-              <div class="flex min-h-[44px] min-w-0 flex-1 items-center gap-1 rounded-lg border border-[#c5d8d1] bg-[#f4edea] pl-2 pr-1">
+              <div class={["flex min-h-[48px] w-full items-center gap-1 rounded-lg border border-[#c5d8d1] bg-[#f4edea] pl-2 pr-2 sm:min-w-0 sm:flex-1 sm:w-auto", set["skipped"] && "opacity-60"]}>
                 <.icon name="hero-clock-solid" class="h-4 w-4 shrink-0 text-[#12263a]/50" />
                 <input
                   type="number"
@@ -289,11 +376,12 @@ defmodule GymRarWeb.WorkoutLive do
                   value={duration_display_input(set["duration_seconds"])}
                   min="0"
                   placeholder="Min"
-                  class="min-w-0 flex-1 border-0 bg-transparent py-2 pl-1 pr-2 text-[#12263a] focus:ring-0"
+                  disabled={set["skipped"]}
+                  class="min-w-0 flex-1 border-0 bg-transparent py-2 pl-1 pr-2 text-[#12263a] focus:ring-0 disabled:opacity-70"
                 />
               </div>
             <% else %>
-              <div class="flex min-h-[44px] min-w-0 flex-1 items-center gap-1 rounded-lg border border-[#c5d8d1] bg-[#f4edea] pl-2 pr-1">
+              <div class={["flex min-h-[48px] w-full items-center gap-1 rounded-lg border border-[#c5d8d1] bg-[#f4edea] pl-2 pr-2 sm:min-w-0 sm:flex-1 sm:w-auto", set["skipped"] && "opacity-60"]}>
                 <.icon name="hero-hashtag-solid" class="h-4 w-4 shrink-0 text-[#12263a]/50" />
                 <input
                   type="number"
@@ -302,11 +390,12 @@ defmodule GymRarWeb.WorkoutLive do
                   value={set["reps"]}
                   min="0"
                   placeholder="Wdh"
-                  class="min-w-0 flex-1 border-0 bg-transparent py-2 pl-1 pr-2 text-[#12263a] focus:ring-0"
+                  disabled={set["skipped"]}
+                  class="min-w-0 flex-1 border-0 bg-transparent py-2 pl-1 pr-2 text-[#12263a] focus:ring-0 disabled:opacity-70"
                 />
               </div>
             <% end %>
-            <label class="flex min-h-[44px] shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-[#c5d8d1]/50 bg-[#f4edea]/60 px-2 py-1.5 text-[#12263a]/80" title="übersprungen">
+            <label class="flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#c5d8d1]/50 bg-[#f4edea]/60 px-3 py-2 text-sm text-[#12263a]/80 sm:w-auto sm:shrink-0" title="übersprungen">
               <input
                 type="checkbox"
                 name={"row_#{@index}_set_#{set_idx}_skipped"}
@@ -315,8 +404,19 @@ defmodule GymRarWeb.WorkoutLive do
                 class="h-4 w-4 rounded border-[#c5d8d1]"
               />
               <.icon name="hero-minus-circle-solid" class="h-4 w-4 shrink-0 text-[#12263a]/50" />
+              <span class="sm:hidden">Übersprungen</span>
             </label>
           </div>
+        </div>
+        <div class="mt-2">
+          <button
+            type="button"
+            phx-click={@on_add_set}
+            phx-value-index={@index}
+            class="text-sm text-[#06bcc1] underline hover:no-underline"
+          >
+            + Satz hinzufügen
+          </button>
         </div>
       </div>
     </div>
@@ -366,6 +466,8 @@ defmodule GymRarWeb.WorkoutLive do
         for _ <- 1..num_sets do
           %{
             "weight_kg" => "",
+            "weight_bodyweight" => false,
+            "weight_extra_kg" => "",
             "reps" => "",
             "duration_seconds" => default_duration_min,
             "skipped" => false
@@ -378,9 +480,56 @@ defmodule GymRarWeb.WorkoutLive do
   end
 
   defp rebuild_rows_keep_sets(template, user_id, location_id, current_rows) do
-    new_rows = build_rows(template, user_id, location_id)
-    Enum.zip(current_rows, new_rows)
-    |> Enum.map(fn {cur, new} -> %{new | sets: cur.sets} end)
+    new_template_rows = build_rows(template, user_id, location_id)
+    template_count = length(new_template_rows)
+    {template_current, temp_rows} = Enum.split(current_rows, template_count)
+    rebuilt =
+      Enum.zip(template_current, new_template_rows)
+      |> Enum.map(fn {cur, new} -> %{new | sets: cur.sets} end)
+    rebuilt ++ temp_rows
+  end
+
+  defp new_set_default(row) do
+    if row[:template_exercise] do
+      te = row.template_exercise
+      default_duration = if te.default_duration_seconds && te.default_duration_seconds > 0, do: to_string(div(te.default_duration_seconds, 60)), else: ""
+      %{"weight_kg" => "", "weight_bodyweight" => false, "weight_extra_kg" => "", "reps" => "", "duration_seconds" => default_duration, "skipped" => false}
+    else
+      %{"weight_kg" => "", "weight_bodyweight" => false, "weight_extra_kg" => "", "reps" => "", "duration_seconds" => "", "skipped" => false}
+    end
+  end
+
+  defp build_set_attrs_for_save(sets, row_idx, params) do
+    sets
+    |> Enum.with_index()
+    |> Enum.map(fn {_set, set_idx} ->
+      prefix = "row_#{row_idx}_set_#{set_idx}_"
+      bodyweight = params[prefix <> "weight_bodyweight"] == "true"
+      weight_kg = if bodyweight, do: nil, else: params[prefix <> "weight_kg"]
+      weight_extra_kg = if bodyweight, do: params[prefix <> "weight_extra_kg"], else: nil
+      reps = params[prefix <> "reps"]
+      duration_seconds = params[prefix <> "duration_seconds"]
+      skipped = params[prefix <> "skipped"] == "true"
+
+      duration_sec =
+        if duration_seconds != nil && duration_seconds != "" do
+          case Integer.parse(duration_seconds) do
+            {min, _} -> min * 60
+            :error -> nil
+          end
+        else
+          nil
+        end
+
+      %{
+        "weight_kg" => weight_kg,
+        "weight_bodyweight" => bodyweight,
+        "weight_extra_kg" => weight_extra_kg,
+        "reps" => reps,
+        "duration_seconds" => duration_sec,
+        "skipped" => skipped
+      }
+    end)
   end
 
   defp params_to_rows(params, rows) do
@@ -391,8 +540,11 @@ defmodule GymRarWeb.WorkoutLive do
         |> Enum.with_index()
         |> Enum.map(fn {set, set_idx} ->
           prefix = "row_#{row_idx}_set_#{set_idx}_"
+          bodyweight = params[prefix <> "weight_bodyweight"] == "true"
           %{
             "weight_kg" => params[prefix <> "weight_kg"] || set["weight_kg"] || "",
+            "weight_bodyweight" => bodyweight,
+            "weight_extra_kg" => params[prefix <> "weight_extra_kg"] || set["weight_extra_kg"] || "",
             "reps" => params[prefix <> "reps"] || set["reps"] || "",
             "duration_seconds" => params[prefix <> "duration_seconds"] || set["duration_seconds"] || "",
             "skipped" => params[prefix <> "skipped"] == "true"
@@ -476,6 +628,71 @@ defmodule GymRarWeb.WorkoutLive do
     {:noreply, assign(socket, :rows, rows)}
   end
 
+  def handle_event("add_temp_exercise", params, socket) do
+    user_id = socket.assigns.current_user.id
+
+    if params["create_and_add"] == "true" && String.trim(params["new_exercise_name"] || "") != "" do
+      name = String.trim(params["new_exercise_name"])
+      count_str = params["new_exercise_sets"] || "1"
+      count = min(max(String.to_integer(count_str), 1), 5)
+      case Exercises.create_exercise(user_id, %{"name" => name}) do
+        {:ok, exercise} ->
+          exercises = Exercises.list_exercises(user_id)
+          sets = for _ <- 1..count do
+            %{"weight_kg" => "", "weight_bodyweight" => false, "weight_extra_kg" => "", "reps" => "", "duration_seconds" => "", "skipped" => false}
+          end
+          new_row = %{exercise: exercise, exercise_id: exercise.id, sets: sets, temp?: true}
+          rows = socket.assigns.rows ++ [new_row]
+          {:noreply,
+           socket
+           |> assign(:rows, rows)
+           |> assign(:exercises, exercises)}
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Übung konnte nicht angelegt werden (evtl. Name schon vorhanden).")}
+      end
+    else
+      ex_id = params["exercise_id"]
+      if ex_id == nil || ex_id == "" do
+        {:noreply, put_flash(socket, :error, "Bitte eine Übung wählen oder eine neue anlegen.")}
+      else
+        ex_id = String.to_integer(ex_id)
+        count_str = params["sets_count"] || "1"
+        count = min(max(String.to_integer(count_str), 1), 5)
+        exercise = Exercises.get_exercise!(user_id, ex_id)
+        sets = for _ <- 1..count do
+          %{"weight_kg" => "", "weight_bodyweight" => false, "weight_extra_kg" => "", "reps" => "", "duration_seconds" => "", "skipped" => false}
+        end
+        new_row = %{exercise: exercise, exercise_id: exercise.id, sets: sets, temp?: true}
+        rows = socket.assigns.rows ++ [new_row]
+        {:noreply, assign(socket, :rows, rows)}
+      end
+    end
+  end
+
+  def handle_event("remove_temp_row", %{"index" => idx}, socket) do
+    idx = String.to_integer(idx)
+    row = Enum.at(socket.assigns.rows, idx)
+    if row && row[:temp?] do
+      rows = List.delete_at(socket.assigns.rows, idx)
+      {:noreply, assign(socket, :rows, rows)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("add_set", %{"index" => idx}, socket) do
+    idx = String.to_integer(idx)
+    row = Enum.at(socket.assigns.rows, idx)
+    if row do
+      new_set = new_set_default(row)
+      updated_row = %{row | sets: row.sets ++ [new_set]}
+      rows = List.replace_at(socket.assigns.rows, idx, updated_row)
+      {:noreply, assign(socket, :rows, rows)}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_event("save_workout", params, socket) do
     if socket.assigns.location_id == nil do
       {:noreply,
@@ -495,41 +712,18 @@ defmodule GymRarWeb.WorkoutLive do
     rows_data =
       Enum.with_index(rows)
       |> Enum.map(fn {row, row_idx} ->
-        sets =
-          row.sets
-          |> Enum.with_index()
-          |> Enum.map(fn {_set, set_idx} ->
-            prefix = "row_#{row_idx}_set_#{set_idx}_"
-            weight_kg = params[prefix <> "weight_kg"]
-            reps = params[prefix <> "reps"]
-            duration_seconds = params[prefix <> "duration_seconds"]
-            skipped = params[prefix <> "skipped"] == "true"
+        sets = build_set_attrs_for_save(row.sets, row_idx, params)
 
-            duration_sec =
-              if duration_seconds != nil && duration_seconds != "" do
-                case Integer.parse(duration_seconds) do
-                  {min, _} -> min * 60
-                  :error -> nil
-                end
-              else
-                nil
-              end
-
-            %{
-              "weight_kg" => weight_kg,
-              "reps" => reps,
-              "duration_seconds" => duration_sec,
-              "skipped" => skipped
-            }
-          end)
-
-        %{
-          "template_exercise_id" => row.template_exercise.id,
-          "sets" => sets
-        }
+        if row[:temp?] do
+          %{"exercise_id" => row.exercise_id, "sets" => sets}
+        else
+          %{"template_exercise_id" => row.template_exercise.id, "sets" => sets}
+        end
       end)
 
-    case Workouts.create_workout_from_template(user_id, template, rows_data, location_id) do
+    opts = []
+
+    case Workouts.create_workout_from_template(user_id, template, rows_data, location_id, opts) do
       {:ok, _workout} ->
         if location_id, do: Accounts.update_user_current_location(socket.assigns.current_user, location_id)
         {:noreply,
