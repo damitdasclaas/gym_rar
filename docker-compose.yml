@@ -1,0 +1,24 @@
+# Lokales Setup: Postgres in Docker (gleiche Credentials wie config/dev.exs).
+# Start:  docker compose up -d
+# Dann:   mix ecto.create && mix ecto.migrate
+# App:    mix phx.server (läuft auf dem Host, verbindet zu Postgres im Container)
+
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gym_rar_dev
+    volumes:
+      - gym_rar_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  gym_rar_pgdata:

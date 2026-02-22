@@ -1,0 +1,18 @@
+<div class="flex min-h-screen flex-col items-center justify-center bg-[#f4edea] px-4 py-8">
+  <h1 class="text-3xl font-bold text-[#12263a]">GymRAR</h1>
+  <p class="mt-2 text-center text-[#12263a]/80">Deine Workouts archivieren und Fortschritt im Blick.</p>
+  <div class="mt-8 flex w-full max-w-xs flex-col gap-4">
+    <.link
+      href={~p"/users/log_in"}
+      class="min-h-[48px] w-full rounded-lg bg-[#06bcc1] px-6 py-3 text-center text-base font-semibold text-white hover:opacity-90 active:opacity-95"
+    >
+      Anmelden
+    </.link>
+    <.link
+      href={~p"/users/register"}
+      class="min-h-[48px] w-full rounded-lg border-2 border-[#12263a] bg-transparent px-6 py-3 text-center text-base font-semibold text-[#12263a] hover:bg-[#12263a]/5 active:bg-[#12263a]/10"
+    >
+      Registrieren
+    </.link>
+  </div>
+</div>
