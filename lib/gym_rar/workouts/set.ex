@@ -8,6 +8,7 @@ defmodule GymRar.Workouts.Set do
     field :weight_bodyweight, :boolean, default: false
     field :weight_extra_kg, :decimal
     field :reps, :integer
+    field :duration_seconds, :integer
     field :from_template, :boolean, default: true
     field :skipped, :boolean, default: false
     belongs_to :workout_exercise, GymRar.Workouts.WorkoutExercise
@@ -24,6 +25,7 @@ defmodule GymRar.Workouts.Set do
       :weight_bodyweight,
       :weight_extra_kg,
       :reps,
+      :duration_seconds,
       :from_template,
       :skipped,
       :workout_exercise_id

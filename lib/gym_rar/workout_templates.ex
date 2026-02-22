@@ -15,6 +15,16 @@ defmodule GymRar.WorkoutTemplates do
     |> Repo.all()
   end
 
+  def list_workout_templates_with_exercises(user_id) do
+    exercises_ordered = from(te in WorkoutTemplateExercise, order_by: [asc: te.position], preload: :exercise)
+
+    WorkoutTemplate
+    |> where([t], t.user_id == ^user_id)
+    |> order_by([t], asc: t.name)
+    |> preload(workout_template_exercises: ^exercises_ordered)
+    |> Repo.all()
+  end
+
   def get_workout_template!(user_id, id) do
     WorkoutTemplate
     |> where([t], t.user_id == ^user_id and t.id == ^id)
@@ -29,8 +39,9 @@ defmodule GymRar.WorkoutTemplates do
   end
 
   def create_workout_template(user_id, attrs \\ %{}) do
+    attrs = Map.put(attrs, "user_id", user_id)
     %WorkoutTemplate{}
-    |> WorkoutTemplate.changeset(Map.put(attrs, :user_id, user_id))
+    |> WorkoutTemplate.changeset(attrs)
     |> Repo.insert()
   end
 
@@ -50,12 +61,13 @@ defmodule GymRar.WorkoutTemplates do
 
   # WorkoutTemplateExercise
   def add_exercise_to_template(template_id, exercise_id, attrs \\ %{}) do
-    %WorkoutTemplateExercise{}
-    |> WorkoutTemplateExercise.changeset(
+    attrs =
       attrs
-      |> Map.put(:workout_template_id, template_id)
-      |> Map.put(:exercise_id, exercise_id)
-    )
+      |> Map.put("workout_template_id", template_id)
+      |> Map.put("exercise_id", exercise_id)
+
+    %WorkoutTemplateExercise{}
+    |> WorkoutTemplateExercise.changeset(attrs)
     |> Repo.insert()
   end
 

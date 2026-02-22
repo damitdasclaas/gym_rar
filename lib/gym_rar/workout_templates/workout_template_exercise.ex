@@ -4,10 +4,9 @@ defmodule GymRar.WorkoutTemplates.WorkoutTemplateExercise do
 
   schema "workout_template_exercises" do
     field :position, :integer, default: 0
-    field :default_weight_kg, :decimal
-    field :default_weight_bodyweight, :boolean, default: false
-    field :default_weight_extra_kg, :decimal
-    field :default_reps, :integer
+    field :default_reps_min, :integer
+    field :default_reps_max, :integer
+    field :default_duration_seconds, :integer
     field :default_sets, :integer, default: 1
     belongs_to :workout_template, GymRar.WorkoutTemplates.WorkoutTemplate
     belongs_to :exercise, GymRar.Exercises.Exercise
@@ -20,10 +19,9 @@ defmodule GymRar.WorkoutTemplates.WorkoutTemplateExercise do
     template_exercise
     |> cast(attrs, [
       :position,
-      :default_weight_kg,
-      :default_weight_bodyweight,
-      :default_weight_extra_kg,
-      :default_reps,
+      :default_reps_min,
+      :default_reps_max,
+      :default_duration_seconds,
       :default_sets,
       :workout_template_id,
       :exercise_id
